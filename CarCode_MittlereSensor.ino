@@ -35,11 +35,43 @@ void setup() {
 //Wert ist groeser, je naeher objekt
 int value_rechts, value_links, diff;
 
+const float k = 7.5;
+
 void loop() {
   value_rechts = analogRead(RECHTER_SENSOR);
   value_links = analogRead(LINKER_SENSOR);
   diff = (value_rechts - value_links)*k;
-+  Serial.println(value_rechts);
-  Serial.println(value_links);
-  Serial.println(diff);
+  
+  if (diff > 510)
+    diff = 510;
+  else if (diff < -510)
+    diff = -510;
+
+  if (diff < 0)
+    drive(255+diff, 255);
+
+  else if (diff > 0)
+    drive(255, 255-diff);
+
   delay(500);
+}
+
+void drive(int left, int right) {
+  if (left > 0) {
+    analogWrite(p_lf, left);
+    analogWrite(p_lb, 0);
+  } 
+  else {
+    analogWrite(p_lb, -left);
+    analogWrite(p_lf, 0);
+  }
+
+  if (right > 0) {
+    analogWrite(p_rf, right);
+    analogWrite(p_rb, 0);
+  } 
+  else {
+    analogWrite(p_rb, -right);
+    analogWrite(p_rf, 0);
+  }
+}
