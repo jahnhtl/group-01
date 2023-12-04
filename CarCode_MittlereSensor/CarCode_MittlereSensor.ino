@@ -2,10 +2,10 @@
 #define CLEAR_BIT(REG,BIT)  (REG = REG & ~(1 << BIT))
 #define GET_BIT(REG,BIT)    ((REG & (1 << BIT)) >> BIT)
 
-#define MOTOR_A1 3
-#define MOTOR_A2 5
-#define MOTOR_B1 6
-#define MOTOR_B2 9
+#define p_lf 3
+#define p_lb 5
+#define p_rf 6
+#define p_rb 9
 #define RECHTER_SENSOR  A1
 #define LINKER_SENSOR   A2
 #define BUTTON 2
@@ -19,10 +19,10 @@ void setup() {
   Serial.begin(9600);
   pinMode(RECHTER_SENSOR, INPUT);
   pinMode(LINKER_SENSOR, INPUT);
-  pinMode(MOTOR_A1, OUTPUT);
-  pinMode(MOTOR_A2, OUTPUT);
-  pinMode(MOTOR_B1, OUTPUT);
-  pinMode(MOTOR_A2, OUTPUT);
+  pinMode(p_lf, OUTPUT);
+  pinMode(p_lb, OUTPUT);
+  pinMode(p_rf, OUTPUT);
+  pinMode(p_rb, OUTPUT);
   pinMode(BUTTON, INPUT_PULLUP);
  
   SET_BIT(EICRA, ISC11);               
@@ -42,18 +42,17 @@ void loop() {
   value_links = analogRead(LINKER_SENSOR);
   diff = (value_rechts - value_links)*k;
   
-  if (diff > 510)
-    diff = 510;
-  else if (diff < -510)
-    diff = -510;
+  if (diff > 255)
+    diff = 255;
+  else if (diff < -255)
+    diff = -255;
 
   if (diff < 0)
-    drive(255+diff, 255);
+    drive(255, 255 + diff);
 
   else if (diff > 0)
-    drive(255, 255-diff);
+    drive(255-diff, 255);
 
-  delay(500);
 }
 
 void drive(int left, int right) {
