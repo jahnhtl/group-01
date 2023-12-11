@@ -35,7 +35,7 @@ void setup() {
 //Wert ist groeser, je naeher objekt
 int value_rechts, value_links, diff;
 
-const float k = 7.5;
+const float k = 15.0;
 
 void loop() {
   value_rechts = analogRead(RECHTER_SENSOR);
@@ -47,8 +47,8 @@ void loop() {
   else if (diff < -255)
     diff = -255;
 
-  if (diff < 0)
-    drive(255, 255 + diff);
+  if (diff <= 0)
+    drive(255, 255+diff);
 
   else if (diff > 0)
     drive(255-diff, 255);
