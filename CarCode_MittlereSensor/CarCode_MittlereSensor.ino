@@ -8,11 +8,12 @@
 #define p_rb 9
 #define RECHTER_SENSOR  A1
 #define LINKER_SENSOR   A2
-#define BUTTON 2
+#define MITTLERER_SENSOR A0
+#define STOP_BUTTON 2
+#define START_BUTTON 1
 
 void drive(int left, int right);
 
-int doDebug = 1;
 int doDrive = 0;
 
 void setup() {
@@ -23,7 +24,8 @@ void setup() {
   pinMode(p_lb, OUTPUT);
   pinMode(p_rf, OUTPUT);
   pinMode(p_rb, OUTPUT);
-  pinMode(BUTTON, INPUT_PULLUP);
+  pinMode(STOP_BUTTON, INPUT_PULLUP);
+  pinMode(START_BUTTON, INPUT_PULLUP);
  
   SET_BIT(EICRA, ISC11);               
   SET_BIT(EICRA, ISC10); 
@@ -31,17 +33,30 @@ void setup() {
   sei();
 }
 
-
 //Wert ist groeser, je naeher objekt
-int value_rechts, value_links, diff;
+int value_rechts, value_links, value_middle, diff;
 
-const float k = 15.0;
+int Middle_threshhold = 230;
+
+const float k = 5.0;
 
 void loop() {
+  Serial.println(doDrive);
   value_rechts = analogRead(RECHTER_SENSOR);
   value_links = analogRead(LINKER_SENSOR);
-  diff = (value_rechts - value_links)*k;
+  value_middle = analogRead(MITTLERER_SENSOR);
   
+  diff = (value_rechts - value_links)*k;
+
+  while (!doDrive) {
+    drive(0, 0);
+    doDrive = !digitalRead(START_BUTTON);
+    delay(50);
+  }
+
+  if (value_middle > Middle_threshhold)
+    doDrive = 0;
+    
   if (diff > 255)
     diff = 255;
   else if (diff < -255)
@@ -73,4 +88,8 @@ void drive(int left, int right) {
     analogWrite(p_rb, -right);
     analogWrite(p_rf, 0);
   }
+}
+
+ISR(INT0_vect){
+  doDrive = 0;
 }
