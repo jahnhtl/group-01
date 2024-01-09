@@ -36,27 +36,48 @@ void setup() {
 //Wert ist groeser, je naeher objekt
 int value_rechts, value_links, value_middle, diff;
 
-int Middle_threshhold = 230;
+int Threshhold_begin_curve = 250;
+int Threshhold_end_curve = 200;
 
-const float k = 5.0;
-
+float k = 2.0;
+int state = 0;
+/*
+ * 0: Mittenregelung
+ * 1: Kurve
+ */
 void loop() {
-  Serial.println(doDrive);
+  // Linker Sensor "schaut" nach rechts
   value_rechts = analogRead(RECHTER_SENSOR);
   value_links = analogRead(LINKER_SENSOR);
   value_middle = analogRead(MITTLERER_SENSOR);
   
-  diff = (value_rechts - value_links)*k;
-
   while (!doDrive) {
     drive(0, 0);
     doDrive = !digitalRead(START_BUTTON);
+
+    value_rechts = analogRead(RECHTER_SENSOR);
+  value_links = analogRead(LINKER_SENSOR);
+  value_middle = analogRead(MITTLERER_SENSOR);
+
+    Serial.print("Links: "); Serial.println(value_links);
+    Serial.print("Mitte: "); Serial.println(value_middle);
+    Serial.print("Rechts: "); Serial.println(value_rechts);
+    Serial.println();
     delay(50);
   }
 
-  if (value_middle > Middle_threshhold)
-    doDrive = 0;
-    
+  if (value_middle < Threshhold_begin_curve && state == 0) {
+    k = 7.5;
+    state = 1;
+  }
+
+  if (value_middle < Threshhold_end_curve && state == 1) {
+    k = 2.0;
+    state = 0;
+  }
+  
+  diff = (value_rechts - value_links)*k;
+
   if (diff > 255)
     diff = 255;
   else if (diff < -255)
