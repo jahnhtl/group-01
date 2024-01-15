@@ -14,8 +14,8 @@
 
 void drive(int left, int right);
 
-int doDrive = 1;
-int numSamples = 30;
+int doDrive = 0;
+int numSamples = 15;
 
 void setup() {
   Serial.begin(9600);
@@ -37,14 +37,17 @@ void setup() {
 //Wert ist groeser, je naeher objekt
 int value_rechts, value_links, value_middle, diff;
 int vals[3];
-int Threshhold_begin_curve = 7500;
-int Threshhold_end_curve = 6000;
+int Threshhold_begin_curve = 2800;
+int Threshhold_begin_curve_side = 1500;
 
-float k = 0.067;
+int Threshhold_end_curve = 1500;
+
+float k = 0.04;
 int state = 0;
 /*
  * 0: Mittenregelung
- * 1: Kurve
+ * 1: Linkskurve
+ * 2: Rechtskurve
  */
 
 void get_vals() {
@@ -77,28 +80,39 @@ void loop() {
     delay(50);
   }
 
-  if (value_middle < Threshhold_begin_curve && state == 0) {
-    k = 0.35;
-    state = 1;
+  switch (state) {
+    case (0):
+      diff = (value_rechts - value_links)*k;
+
+      if (diff > 255)
+        diff = 255;
+      else if (diff < -255)
+        diff = -255;
+    
+      if (diff <= 0)
+        drive(255, 255+diff);
+    
+      else if (diff > 0)
+        drive(255-diff, 255); 
+ 
+      if (value_middle > Threshhold_begin_curve && (value_links < Threshhold_begin_curve_side || value_rechts < Threshhold_begin_curve_side)) {
+        if (value_rechts > value_links)
+          state = 1;
+        else
+          state = 2;
+      }
+      break;
+    case (1):
+      drive(0, 128);
+        if (value_middle < Threshhold_end_curve)
+          state = 0; 
+      break;
+    case (2):
+      drive(128, 0);
+      if (value_middle < Threshhold_end_curve)
+        state = 0; 
+      break;
   }
-
-  if (value_middle < Threshhold_end_curve && state == 1) {
-    k = 0.067;
-    state = 0;
-  }
-  
-  diff = (value_rechts - value_links)*k;
-
-  if (diff > 255)
-    diff = 255;
-  else if (diff < -255)
-    diff = -255;
-
-  if (diff <= 0)
-    drive(255, 255+diff);
-
-  else if (diff > 0)
-    drive(255-diff, 255);
 }
 
 void drive(int left, int right) {
