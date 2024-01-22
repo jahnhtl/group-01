@@ -12,6 +12,8 @@
 #define STOP_BUTTON 2
 #define START_BUTTON 1
 
+#define p_led 4
+
 void drive(int left, int right);
 
 int doDrive = 0;
@@ -37,8 +39,8 @@ void setup() {
 //Wert ist groeser, je naeher objekt
 int value_rechts, value_links, value_middle, diff;
 int vals[3];
-int Threshhold_begin_curve = 2800;
-int Threshhold_begin_curve_side = 1500;
+int Threshhold_begin_curve = 2250;
+int Threshhold_begin_curve_side = 800;
 
 int Threshhold_end_curve = 1500;
 
@@ -82,12 +84,13 @@ void loop() {
 
   switch (state) {
     case (0):
+      digitalWrite(p_led, 0);
       diff = (value_rechts - value_links)*k;
 
-      if (diff > 255)
-        diff = 255;
-      else if (diff < -255)
-        diff = -255;
+      if (diff > 128)
+        diff = 128;
+      else if (diff < -128)
+        diff = -128;
     
       if (diff <= 0)
         drive(255, 255+diff);
@@ -95,27 +98,33 @@ void loop() {
       else if (diff > 0)
         drive(255-diff, 255); 
  
-      if (value_middle > Threshhold_begin_curve && (value_links < Threshhold_begin_curve_side || value_rechts < Threshhold_begin_curve_side)) {
+      if (value_middle > Threshhold_begin_curve || (value_links < Threshhold_begin_curve_side || value_rechts < Threshhold_begin_curve_side)) {
         if (value_rechts > value_links)
           state = 1;
         else
           state = 2;
       }
       break;
+      
     case (1):
-      drive(0, 128);
-        if (value_middle < Threshhold_end_curve)
+      digitalWrite(p_led, 1);
+      drive(32, 128);
+        if (value_middle < Threshhold_end_curve && value_links > Threshhold_begin_curve_side && value_rechts > Threshhold_begin_curve_side )
           state = 0; 
       break;
+      
     case (2):
-      drive(128, 0);
-      if (value_middle < Threshhold_end_curve)
+      digitalWrite(p_led, 1);
+      drive(128, 32);
+      if (value_middle < Threshhold_end_curve && value_links > Threshhold_begin_curve_side && value_rechts > Threshhold_begin_curve_side )
         state = 0; 
       break;
   }
 }
 
 void drive(int left, int right) {
+  left /= 1;
+  right /= 1;
   if (left > 0) {
     analogWrite(p_lf, left);
     analogWrite(p_lb, 0);
@@ -134,7 +143,6 @@ void drive(int left, int right) {
     analogWrite(p_rf, 0);
   }
 }
-
 
 
 ISR(INT0_vect){
