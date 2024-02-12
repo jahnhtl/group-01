@@ -7,7 +7,7 @@
 #define p_rf 6
 #define p_rb 9
 #define RECHTER_SENSOR  A1
-#define LINKER_SENSOR   A2
+#define LINKER_SENSOR   A5
 #define MITTLERER_SENSOR A0
 #define STOP_BUTTON 2
 #define START_BUTTON 1
@@ -17,16 +17,26 @@
 void drive(int left, int right);
 
 int doDrive = 0;
-int numSamples = 15;
+int numSamples = 3;
+
+uint8_t values_left[100];
+uint8_t values_middle[100];
+uint8_t values_right[100];
+int average_right, average_left, average_middle, diff;
+int index = 0;
 
 void setup() {
   Serial.begin(9600);
   pinMode(RECHTER_SENSOR, INPUT);
   pinMode(LINKER_SENSOR, INPUT);
+  pinMode(MITTLERER_SENSOR, INPUT);
+  
   pinMode(p_lf, OUTPUT);
   pinMode(p_lb, OUTPUT);
   pinMode(p_rf, OUTPUT);
   pinMode(p_rb, OUTPUT);
+  pinMode(p_led, OUTPUT);
+  
   pinMode(STOP_BUTTON, INPUT_PULLUP);
   pinMode(START_BUTTON, INPUT_PULLUP);
  
@@ -37,14 +47,12 @@ void setup() {
 }
 
 //Wert ist groeser, je naeher objekt
-int value_rechts, value_links, value_middle, diff;
-int vals[3];
-int Threshhold_begin_curve = 2250;
-int Threshhold_begin_curve_side = 800;
+int Threshhold_begin_curve = 15000;
+int Threshhold_begin_curve_side = 5300;
 
-int Threshhold_end_curve = 1500;
+int Threshhold_end_curve = 10000;
 
-float k = 0.04;
+float k = 0.006;
 int state = 0;
 /*
  * 0: Mittenregelung
@@ -53,31 +61,37 @@ int state = 0;
  */
 
 void get_vals() {
-  
-  vals[0] = 0; vals[1] = 0; vals[2] = 0;
-  for (int i = 0; i < numSamples; i++)
-    vals[0] += analogRead(LINKER_SENSOR);
-  for (int i = 0; i < numSamples; i++)
-    vals[1] += analogRead(MITTLERER_SENSOR);
-  for (int i = 0; i < numSamples; i++)
-    vals[2] += analogRead(RECHTER_SENSOR); 
+  values_left[index] = analogRead(LINKER_SENSOR);
+  values_middle[index] = analogRead(MITTLERER_SENSOR);
+  values_right[index] = analogRead(RECHTER_SENSOR);
+  index += 1;
+  if (index == 100)
+    index = 0;
+
+  average_left = 0;
+  average_middle = 0;
+  average_right = 0; 
+
+  for (int i = 0; i < 100; i++) {
+    average_left += values_left[i];
+    average_middle += values_middle[i];
+    average_right += values_right[i];
+  }
 }
 
 void loop() {
   // Linker Sensor "schaut" nach rechts
   get_vals();
-  value_links = vals[0];
-  value_middle = vals[1];
-  value_rechts = vals[2];
   
   while (!doDrive) {
     drive(0, 0);
     doDrive = !digitalRead(START_BUTTON);
 
-    get_vals();
-    Serial.print(vals[0]); Serial.print(",");
-    Serial.print(vals[1]); Serial.print(",");
-    Serial.println(vals[2]); Serial.print(",");
+    for (int i=0; i<50;i++)
+      get_vals();
+    Serial.print(analogRead(LINKER_SENSOR)); Serial.print(",");
+    Serial.print(analogRead(RECHTER_SENSOR)); Serial.print(",");
+    Serial.println(analogRead(MITTLERER_SENSOR)); Serial.print(",");
     Serial.println();
     delay(50);
   }
@@ -85,7 +99,7 @@ void loop() {
   switch (state) {
     case (0):
       digitalWrite(p_led, 0);
-      diff = (value_rechts - value_links)*k;
+      diff = (average_right - average_left)*k;
 
       if (diff > 128)
         diff = 128;
@@ -98,8 +112,8 @@ void loop() {
       else if (diff > 0)
         drive(255-diff, 255); 
  
-      if (value_middle > Threshhold_begin_curve || (value_links < Threshhold_begin_curve_side || value_rechts < Threshhold_begin_curve_side)) {
-        if (value_rechts > value_links)
+      if (average_middle > Threshhold_begin_curve || (average_left < Threshhold_begin_curve_side || average_right < Threshhold_begin_curve_side)) {
+        if (average_right > average_left)
           state = 1;
         else
           state = 2;
@@ -109,22 +123,22 @@ void loop() {
     case (1):
       digitalWrite(p_led, 1);
       drive(32, 128);
-        if (value_middle < Threshhold_end_curve && value_links > Threshhold_begin_curve_side && value_rechts > Threshhold_begin_curve_side )
+        if (average_middle < Threshhold_end_curve && average_left > Threshhold_begin_curve_side && average_right > Threshhold_begin_curve_side )
           state = 0; 
       break;
       
     case (2):
       digitalWrite(p_led, 1);
       drive(128, 32);
-      if (value_middle < Threshhold_end_curve && value_links > Threshhold_begin_curve_side && value_rechts > Threshhold_begin_curve_side )
+      if (average_middle < Threshhold_end_curve && average_left > Threshhold_begin_curve_side && average_right > Threshhold_begin_curve_side )
         state = 0; 
       break;
   }
 }
 
 void drive(int left, int right) {
-  left /= 1;
-  right /= 1;
+  left /= 2;
+  right /= 2;
   if (left > 0) {
     analogWrite(p_lf, left);
     analogWrite(p_lb, 0);
