@@ -6,8 +6,8 @@
 #define p_lb 5
 #define p_rf 6
 #define p_rb 9
-#define RECHTER_SENSOR  A5
-#define LINKER_SENSOR   A1
+#define RECHTER_SENSOR  A1
+#define LINKER_SENSOR   A5
 #define MITTLERER_SENSOR A0
 #define STOP_BUTTON 2
 #define START_BUTTON 1
@@ -18,7 +18,7 @@ void drive(int left, int right);
 
 int doDrive = 0;
 const int numSamples = 16;
-const int k = 12;
+const int k = 4;
 
 uint16_t values_left[numSamples];
 uint16_t values_middle[numSamples];
@@ -26,7 +26,16 @@ uint16_t values_right[numSamples];
 uint16_t average_right_raw, average_left_raw, average_middle_raw;
 int diff;
 uint16_t left, middle, right;
+uint16_t old_left, old_middle, old_right;
+uint16_t dldt, drdt;
+
 int index = 0;
+
+enum State {
+  MITTENREGELN,
+  LINKSKURVE,
+  RECHTSKURVE
+} state = MITTENREGELN;
 
 void setup() {
   Serial.begin(9600);
@@ -55,7 +64,6 @@ int Threshhold_begin_curve_side = 800;
 int Threshhold_end_curve_side = 1000;
 //int Threshhold_end_curve = 0;
 
-int state = 0;
 /*
  * 0: Mittenregelung
  * 1: Linkskurve
@@ -97,28 +105,33 @@ void loop() {
   if (left > 100)   left = 100;
   if (middle > 150) middle = 150;
 
-  diff = (int) (right - left);
+  diff = (int) (right) - (int)(left);
+  dldt = left - old_left;
+  drdt = right - old_right;
 
   if (!doDrive) {
     drive(0, 0);
   
-    Serial.print(left); Serial.println(" cm");
-    Serial.print(middle); Serial.println(" cm");
-    Serial.print(right); Serial.println(" cm");
+    Serial.print("links: "); Serial.print(left); Serial.println(" cm");
+    Serial.print("mitte: ");Serial.print(middle); Serial.println(" cm");
+    Serial.print("rechts: ");Serial.print(right); Serial.println(" cm");
     Serial.println();
-    Serial.print("diff: "); Serial.print(diff); Serial.println(" cm");
+    Serial.print("diff: "); Serial.print(diff*k); Serial.println(" cm");
+    Serial.print("dl/dt: "); Serial.print(dldt); Serial.println(" cm");
+    Serial.print("dr/dt: "); Serial.print(drdt); Serial.println(" cm");
+    Serial.println();
     
     delay(100);
     return;
   }
 
   switch (state) {
-    case (0):
+    case (MITTENREGELN):
       digitalWrite(p_led, 0);
-      if (diff > 20)
-        diff = 20;
-      else if (diff < -20)
-        diff = -20;
+      if (diff > 40)
+        diff = 40;
+      else if (diff < -40)
+        diff = -40;
     
       if (diff <= 0)
         drive(255 + diff*k, 255);
@@ -126,31 +139,33 @@ void loop() {
       else if (diff > 0)
         drive(255, 255 - diff*k); 
 
-      if ((left > 90 || right > 90)) {
-        if (left > right)
-          state = 2;
+      if (left > 90 && dldt > 7)
+        state = LINKSKURVE;
 
-        else
-          state = 1;
-      }
+      else if ((right > 90 && drdt > 7))
+        state = RECHTSKURVE;
+        
       break;
       
-    case (1):
+    case (LINKSKURVE):
       digitalWrite(p_led, 1);
       drive(32, 128);
         // average_middle < Threshhold_end_curve &&
-        if ( left < 60 && right < 60 )
-          state = 0; 
+        if ( left < 65 && right < 65 )
+          state = MITTENREGELN; 
       break;
       
-    case (2):
+    case (RECHTSKURVE):
       digitalWrite(p_led, 1);
       drive(128, 32);
       // average_middle < Threshhold_end_curve &&
-      if ( left < 60 && right < 60 )
-        state = 0; 
+      if ( left < 65 && right < 65 )
+        state = MITTENREGELN; 
       break;
   }
+  old_left = left;
+  old_middle = middle;
+  old_right = right;
 }
 
 void drive(int left, int right) {
