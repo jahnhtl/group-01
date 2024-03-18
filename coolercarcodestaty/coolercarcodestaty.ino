@@ -17,12 +17,15 @@
 void drive(int left, int right);
 
 int doDrive = 0;
-int numSamples = 3;
+const int numSamples = 16;
+const int k = 12;
 
-uint8_t values_left[100];
-uint8_t values_middle[100];
-uint8_t values_right[100];
-int average_right, average_left, average_middle, diff;
+uint16_t values_left[numSamples];
+uint16_t values_middle[numSamples];
+uint16_t values_right[numSamples];
+uint16_t average_right_raw, average_left_raw, average_middle_raw;
+int diff;
+uint16_t left, middle, right;
 int index = 0;
 
 void setup() {
@@ -52,7 +55,6 @@ int Threshhold_begin_curve_side = 800;
 int Threshhold_end_curve_side = 1000;
 //int Threshhold_end_curve = 0;
 
-float k = 0.06;
 int state = 0;
 /*
  * 0: Mittenregelung
@@ -65,57 +67,71 @@ void get_vals() {
   values_middle[index] = analogRead(MITTLERER_SENSOR);
   values_right[index] = analogRead(RECHTER_SENSOR);
   index += 1;
-  if (index == 10)
+  if (index == numSamples)
     index = 0;
 
-  average_left = 0;
-  average_middle = 0;
-  average_right = 0; 
+  average_left_raw = 0;
+  average_middle_raw = 0;
+  average_right_raw = 0; 
 
-  for (int i = 0; i < 10; i++) {
-    average_left += values_left[i];
-    average_middle += values_middle[i];
-    average_right += values_right[i];
+  for (int i = 0; i < numSamples; i++) {
+    average_left_raw += values_left[i];
+    average_middle_raw += values_middle[i];
+    average_right_raw += values_right[i];
   }
+
+  average_left_raw /= numSamples;
+  average_middle_raw /= numSamples;
+  average_right_raw /= numSamples;
 }
 
 void loop() {
   // Linker Sensor "schaut" nach rechts
   get_vals();
-  
-  while (!doDrive) {
+
+  right = (uint16_t) (6336/(average_left_raw - 15.15)) - 2;
+  middle = (uint16_t) (18670.08/(average_middle_raw + 13.44)) - 11;
+  left = (uint16_t) ((5202.9/(average_right_raw - 32.97)) - 12);
+
+  if (right > 100)  right = 100;
+  if (left > 100)   left = 100;
+  if (middle > 150) middle = 150;
+
+  diff = (int) (right - left);
+
+  if (!doDrive) {
     drive(0, 0);
+  
+    Serial.print(left); Serial.println(" cm");
+    Serial.print(middle); Serial.println(" cm");
+    Serial.print(right); Serial.println(" cm");
+    Serial.println();
+    Serial.print("diff: "); Serial.print(diff); Serial.println(" cm");
     
-    for (int i=0; i<50;i++)
-      get_vals();
-    Serial.print(average_left); Serial.print(",");
-    Serial.print(average_middle); Serial.print(",");
-    Serial.print(average_right); Serial.println(",");
-    delay(50);
+    delay(100);
+    return;
   }
 
   switch (state) {
     case (0):
       digitalWrite(p_led, 0);
-      diff = (average_right - average_left)*k;
-
-      if (diff > 128)
-        diff = 128;
-      else if (diff < -128)
-        diff = -128;
+      if (diff > 20)
+        diff = 20;
+      else if (diff < -20)
+        diff = -20;
     
       if (diff <= 0)
-        drive(255, 255+diff);
+        drive(255 + diff*k, 255);
     
       else if (diff > 0)
-        drive(255-diff, 255); 
+        drive(255, 255 - diff*k); 
 
-      // average_middle > Threshhold_begin_curve || 
-      if ((average_left < Threshhold_begin_curve_side || average_right < Threshhold_begin_curve_side)) {
-        if (average_right > average_left)
-          state = 1;
-        else
+      if ((left > 90 || right > 90)) {
+        if (left > right)
           state = 2;
+
+        else
+          state = 1;
       }
       break;
       
@@ -123,7 +139,7 @@ void loop() {
       digitalWrite(p_led, 1);
       drive(32, 128);
         // average_middle < Threshhold_end_curve &&
-        if ( average_left > Threshhold_end_curve_side && average_right > Threshhold_end_curve_side )
+        if ( left < 60 && right < 60 )
           state = 0; 
       break;
       
@@ -131,7 +147,7 @@ void loop() {
       digitalWrite(p_led, 1);
       drive(128, 32);
       // average_middle < Threshhold_end_curve &&
-      if ( average_left > Threshhold_end_curve_side && average_right > Threshhold_end_curve_side )
+      if ( left < 60 && right < 60 )
         state = 0; 
       break;
   }
